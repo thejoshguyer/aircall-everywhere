@@ -1,5 +1,7 @@
 class AircallPhone {
-  constructor(opts = { debug: true }) {
+  constructor(opts =  {}) {
+    const defaultOptions = { debug: true };
+    opts = { ...defaultOptions, ...opts };
     // internal vars
     // window object of loaded aircall phone
     this.phoneWindow = null;
@@ -50,7 +52,7 @@ class AircallPhone {
     this._messageListener();
 
     // load phone in specified dom
-    if (!!this.domToLoadPhone) {
+    if (this.domToLoadPhone) {
       this._createPhoneIframe();
     }
   }
@@ -64,30 +66,29 @@ class AircallPhone {
   }
 
   _createPhoneIframe() {
-    let sizeStyle = '';
-    switch (this.size) {
-      case 'big':
-        sizeStyle = 'height:666px; width:376px;';
-        break;
-      case 'small':
-        sizeStyle = 'height:600px; width:376px;';
-        break;
-      case 'auto':
-        sizeStyle = 'height:100%; width:100%;';
-        break;
-    }
+    const sizeStyles = {
+      big: 'height:666px; width:376px;',
+      small: 'height:600px; width:376px;',
+      auto: 'height:100%; width:100%;'
+    };
+    let sizeStyle = sizeStyles[this.size] || sizeStyles.auto;
+    
 
-    // we get the passed dom
+    // pass the dom and sanitize it for xss attacks
     try {
       const el = document.querySelector(this.domToLoadPhone);
-      el.innerHTML = `<iframe allow="microphone; autoplay; clipboard-read; clipboard-write; hid" src="${this.getUrlToLoad()}" style="${sizeStyle}"></iframe>`;
+      if (el) {
+        const safeUrl = DOMPurify.sanitize(this.getUrlToLoad(), {ALLOWED_TAGS: ['iframe'], ALLOWED_ATTR: ['src', 'allow', 'style']});
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('allow', 'microphone; autoplay; clipboard-read; clipboard-write; hid');
+        iframe.setAttribute('src', safeUrl);
+        iframe.setAttribute('style', sizeStyle);
+        
+        while (el.firstChild) el.removeChild(el.firstChild);
+        el.appendChild(iframe);
+      }
     } catch (e) {
-      // couldnt query the dom wanted
-      this._log(
-        'error',
-        `[AircallEverywhere] [iframe creation] ${this.domToLoadPhone} not be found. Error:`,
-        e
-      );
+      this._log('error', `[AircallEverywhere] [iframe creation] Could not find ${this.domToLoadPhone}. Error:`, e);
     }
   }
 
